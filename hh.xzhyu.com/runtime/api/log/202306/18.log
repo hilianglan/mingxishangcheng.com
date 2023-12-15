@@ -1,0 +1,2 @@
+[2023-06-18T11:23:11+08:00][error] [4096]Object of class app\common\logic\Buy_1 could not be converted to string[/www/wwwroot/hh.xzhyu.com/app/api/controller/Memberpayment.php:37]
+[2023-06-18T19:03:36+08:00][error] [8]未定义数组索引: password[/www/wwwroot/hh.xzhyu.com/app/api/controller/Memberpayment.php:48]

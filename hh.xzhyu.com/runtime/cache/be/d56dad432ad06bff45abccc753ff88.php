@@ -1,0 +1,4 @@
+<?php
+//000000007200
+ exit();?>
+a:4:{i:1;a:4:{s:14:"consulttype_id";i:1;s:16:"consulttype_name";s:12:"商品咨询";s:21:"consulttype_introduce";s:50:"后台->交易->咨询管理->咨询类型->编辑";s:16:"consulttype_sort";i:1;}i:2;a:4:{s:14:"consulttype_id";i:2;s:16:"consulttype_name";s:12:"支付问题";s:21:"consulttype_introduce";s:50:"后台->交易->咨询管理->咨询类型->编辑";s:16:"consulttype_sort";i:2;}i:3;a:4:{s:14:"consulttype_id";i:3;s:16:"consulttype_name";s:15:"发票及保修";s:21:"consulttype_introduce";s:50:"后台->交易->咨询管理->咨询类型->编辑";s:16:"consulttype_sort";i:3;}i:4;a:4:{s:14:"consulttype_id";i:4;s:16:"consulttype_name";s:15:"促销及赠品";s:21:"consulttype_introduce";s:50:"后台->交易->咨询管理->咨询类型->编辑";s:16:"consulttype_sort";i:4;}}
