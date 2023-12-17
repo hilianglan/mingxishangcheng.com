@@ -25,6 +25,8 @@ class  Member extends Validate
         'member_email'=>'email',
         'member_mobile'=>'length:11,11',
         'member_nickname'=>'max:10',
+        'member_type'=>'require|checkMemberType',
+        'pay_sn'=>'require|max:20',
     ];
     protected $message  =   [
         'member_name.require'=>'用户名必填',
@@ -38,6 +40,7 @@ class  Member extends Validate
         'member_email.email'=>'邮箱格式错误',
         'member_mobile.length'=>'手机格式错误',
         'member_nickname.max'=>'真实姓名长度超过10位',
+        'pay_sn.require'=>'支付单号不能为空且长度不能超过20位'
     ];
     protected $scene = [
         'add' => ['member_name', 'member_password', 'member_email'],
@@ -45,7 +48,8 @@ class  Member extends Validate
         'edit_information' => ['member_nickname'],
         'login' => ['member_name', 'member_password'],
         'register' => ['member_name', 'member_password'],
-        'auth' => ['member_truename', 'member_idcard'],
+        'auth' => ['member_truename', 'member_idcard','member_mobile'],
+        'edit_type'=>['member_type','pay_sn'],
     ];
     protected function checkTruename($value,$rule,$data)
     {
@@ -54,5 +58,13 @@ class  Member extends Validate
     protected function checkIdcard($value,$rule,$data)
     {
         return preg_match('/^[1-9]\d{5}(18|19|20|(3\d))\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$/',$value)?true:false;
+    }
+    protected function checkMemberType($member_type){
+        $types = array_keys(config('member.member_type'));
+
+        if (!in_array($member_type,$types)) {
+            return false;
+        }
+        return true;
     }
 }

@@ -548,6 +548,48 @@ class Member extends MobileMember {
         ds_json_encode(10000);
     }
 
+
+    /**
+     * 标记会员类型是创业者还是董事
+     * @return void
+     */
+    public function edit_type()
+    {
+        $member_array['member_type'] = input('param.member_type');
+
+        $member_array['pay_sn'] = input('pay_sn');
+
+        $member_validate = ds_validate('member');
+        if (!$member_validate->scene('edit_type')->check($member_array)) {
+            ds_json_encode(10001, $member_validate->getError());
+        }
+
+        //检查订单状态
+        $order_model = model("order");
+        $condition=[
+            ['pay_sn','=',$member_array['pay_sn']]
+        ];
+
+        $orderCount = $order_model->getOrderStateEvalCount($condition);
+        if(!$orderCount){
+            ds_json_encode(10001, '订单状态有误',['pay_sn'=>$member_array['pay_sn']]);
+        }
+
+        $types = config('member.member_type');
+        $data = array(
+            'member_type' => $types[$member_array['member_type']],
+        );
+        $member_model = model('member');
+        $condition = array();
+        $condition[] = array('member_id', '=', $this->member_info['member_id']);
+        $result = $member_model->editMember($condition, $data, $this->member_info['member_id']);
+        if ($result) {
+            ds_json_encode(10000, lang('ds_common_op_succ'));
+        } else {
+            ds_json_encode(10001, lang('ds_common_op_fail'));
+        }
+    }
+
 }
 
 ?>
