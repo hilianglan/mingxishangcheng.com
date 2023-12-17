@@ -1,5 +1,8 @@
+.env
 /log
 /vendor
 /runtime_yuan
 /runtime
 /config
+/plugins/payments/alipay/cert/
+/public/uploads/
