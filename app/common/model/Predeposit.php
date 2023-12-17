@@ -549,10 +549,13 @@ class Predeposit extends BaseModel {
                 break;
             case 'sys_add_money':
                 $data_log['lg_av_amount'] = $data['amount'];
-                $data_log['lg_desc'] = '管理员调节预存款【增加】，充值单号: ' . $data['pdr_sn'].',备注：'.$data['lg_desc'];
+                $data_log['lg_desc'] = '管理员调节预存款【增加】';
+                if(isset($data['pdr_sn'])){
+                    $data_log['lg_desc'] .= '，充值单号: ' . $data['pdr_sn'];
+                }
+                $data_log['lg_desc'].=',备注：'.$data['lg_desc'];
                 $data_log['lg_admin_name'] = $data['admin_name'];
                 $data_pd['available_predeposit'] = Db::raw('available_predeposit+'.$data['amount']);
-
                 $data_msg['av_amount'] = $data['amount'];
                 $data_msg['freeze_amount'] = 0;
                 $data_msg['desc'] = $data_log['lg_desc'];

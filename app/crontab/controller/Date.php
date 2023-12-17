@@ -2,6 +2,7 @@
 
 namespace app\crontab\controller;
 
+use think\facade\Config;
 use think\facade\Db;
 
 /**
@@ -47,6 +48,8 @@ class Date extends BaseCron {
      * @var int
      */
     const ARRIVAL_NOTICE_NUM = 100;
+
+    const MEMBER_STATE = 1;
 
     /**
      * 默认方法
@@ -109,6 +112,66 @@ class Date extends BaseCron {
 
         //会员相关数据统计
         $this->_member_stat();
+
+        //签到满指定日期则发放预存款
+        $this->_cron_sys_add_money();
+
+    }
+    private function _cron_sys_add_money(){
+        Config::load(base_path() . 'api/config/member.php','member');
+        $pioneer = config('member.pionner');
+        $director = config('member.director');
+        //查找连续签每—年签到满360次,奖励现金1360元现金;每一年签到满363次，奖励现金2999元现金。
+        $member_model = model('member');
+        $field='member_id,member_name,member_type,member_pionner_signin_days_cycle,member_pionner_signin_days_series,member_director_signin_days_cycle,member_director_signin_days_series';
+
+        $where =[
+            'member_state'=>self::MEMBER_STATE,
+            'member_pionner_signin_days_cycle'=>$pioneer['points_signin_cycle'],//创业者每满周期清零
+            'member_type'=>$pioneer['member_type']
+        ];
+        $list = $member_model->getMemberList($where, $field);
+        $predeposit_model = model('predeposit');
+
+        if($list){
+            foreach ($list as $value){
+                if($value['member_pionner_signin_days_series'] && ($value['member_pionner_signin_days_series'] % $pioneer['points_signin_cycle'] == 0)){
+                    $log_array = array();
+                    $log_array['member_id'] = $value['member_id'];
+                    $log_array['member_name'] = $value['member_name'];
+                    $log_array['amount'] = $pioneer['send_money'];
+                    $log_array['lg_desc'] = $pioneer['desc'];
+                    $log_array['admin_name'] = 'system';
+                    $predeposit_model->changePd('sys_add_money', $log_array); //增加买家可用预存款金额
+                    $this->log('member_id='.$value['member_id'].',member_name:'.$value['member_name']
+                        .',签到满一年奖励'.$pioneer['send_money']."元。<br>");
+                }
+            }
+        }
+
+        $where =[
+            'member_state'=>self::MEMBER_STATE,
+            'member_director_signin_days_cycle'=>$director['points_signin_cycle'],//创业者每满周期清零
+            'member_type'=>$director['member_type']
+        ];
+        $list = $member_model->getMemberList($where, $field);
+        if($list){
+            foreach ($list as $value){
+                if($value['member_director_signin_days_series'] && ($value['member_director_signin_days_series'] % $director['points_signin_cycle'] == 0)){
+                    $log_array = array();
+                    $log_array['member_id'] = $value['member_id'];
+                    $log_array['member_name'] = $value['member_name'];
+                    $log_array['amount'] = $director['send_money'];
+                    $log_array['lg_desc']=$director['desc'];
+                    $log_array['admin_name'] = 'system';
+                    $predeposit_model->changePd('sys_add_money', $log_array); //增加买家可用预存款金额
+
+                    $this->log('member_id='.$value['member_id'].',member_name:'.$value['member_name']
+                        .',签到满一年奖励'.$director['send_money']."元。<br>");
+                }
+            }
+
+        }
     }
 
     /*
