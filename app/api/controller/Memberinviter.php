@@ -2,6 +2,8 @@
 
 namespace app\api\controller;
 
+use think\Exception;
+use think\facade\Cache;
 use think\facade\Db;
 use think\facade\Lang;
 
@@ -197,6 +199,89 @@ class Memberinviter extends MobileMember {
         }
         $result = array_merge(array('list' => $order_list), mobile_page($list));
         ds_json_encode(10000, '', $result);
+    }
+
+    /**
+     * 生成支付邀请码
+     * @return void
+     */
+    public function genera_inviter_code()
+    {
+        //判断inviter_code是否唯一
+        $inviter_code = Cache::get('inviter_code:' . $this->member_info['member_id']);
+        if ($inviter_code) {
+            ds_json_encode(10000, '邀请码已生成', ['inviter_code' => $inviter_code]);
+        }
+        $inviter_code_array = [];
+        $inviter_code_array['inviter_code'] = random(4);
+        $inviter_code_array['inviter_id'] = $this->member_info['member_id'];
+        $inviter_code_model = model("inviter_code");
+        $result = $inviter_code_model->addInviter($inviter_code_array);
+        if ($result) {
+            Cache::set('inviter_code:' . $this->member_info['member_id'], $inviter_code_array['inviter_code']);
+            ds_json_encode(10000, '邀请码已生成', ['inviter_code' => $inviter_code_array['inviter_code']]);
+        }
+        ds_json_encode(10001, '邀请码生成失败', $result);
+    }
+
+    /**
+     * 通过邀请码成为创业者数据进行记录
+     * @return void
+     */
+    public function add_inviter_log()
+    {
+        $inviter_log_array = [];
+        $inviter_log_array['inviter_code'] = input('inviter_code');
+        $inviter_log_array['pay_sn'] = input('pay_sn');
+
+        $inviter_validate = ds_validate('inviter_log');
+        if (!$inviter_validate->scene('auth')->check($inviter_log_array)) {
+            ds_json_encode(10001, $inviter_validate->getError());
+        }
+
+        //检查订单状态
+        $order_model = model("order");
+        $condition=[
+            ['pay_sn','=',$inviter_log_array['pay_sn']]
+        ];
+
+        $orderCount = $order_model->getOrderStateEvalCount($condition);
+        if(!$orderCount){
+            ds_json_encode(10001, '订单状态有误',['pay_sn'=>$inviter_log_array['pay_sn']]);
+        }
+
+        $inviter_code_model = model("inviter_code");
+        $condition = [
+            'inviter_code' => $inviter_log_array['inviter_code']
+        ];
+        $inviter_code_info = $inviter_code_model->getInviterCodeInfo($condition, 'i.inviter_id,m.member_name');
+        if (!$inviter_code_info) {
+            ds_json_encode(10001, '邀请码错误', ['inviter_code' => $inviter_log_array['inviter_code']]);
+        }
+        $inviter_log_model = model("inviter_log");
+        $inviter_log_array['inviter_id'] = $inviter_code_info['inviter_id'];
+        $inviter_log_array['member_id'] = $this->member_info['member_id'];
+        try{
+            $inviter_log_model->addInviterLog($inviter_log_array);
+        }catch (Exception $e){
+            ds_json_encode(10001, '请勿重复提交', ['inviter_code' => $inviter_log_array['inviter_code']]);
+        }
+
+        //给邀请者发放奖励
+        $predeposit_model = model('predeposit');
+        $log_array = array();
+        $log_array['member_id'] = $inviter_code_info['inviter_id'];
+        $log_array['member_name'] = $inviter_code_info['member_name'];
+        $log_array['amount'] = config('member.inviter_info')['money'];
+        $log_array['lg_desc'] = config('member.inviter_info')['desc'];
+        $log_array['pdr_sn'] = $inviter_log_array['pay_sn'];
+        $log_array['admin_name'] = 'system';
+        $result = $predeposit_model->changePd('sys_add_money', $log_array); //增加买家可用预存款金额
+        if($result){
+            $data = ['is_send_reward'=>1];
+            $inviter_log_model->editInviterLog($inviter_log_array,$data);
+        }
+        ds_json_encode(10000, '', ['inviter_code' => $inviter_log_array['inviter_code']]);
     }
 
 }
