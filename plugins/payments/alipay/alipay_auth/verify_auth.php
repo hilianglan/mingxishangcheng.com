@@ -25,9 +25,9 @@ class verify_auth
                 //支付宝网关
                 'gatewayUrl' => "https://openapi.alipay.com/gateway.do",
                 //支付宝公钥,查看地址：https://openhome.alipay.com/platform/keyManage.htm 对应APPID下的支付宝公钥。
-                'app_cert_path' => PLUGINS_PATH.'/'.$payment_info['payment_config']['app_cert_path'],
-                'alipay_cert_path' =>PLUGINS_PATH.'/'. $payment_info['payment_config']['alipay_cert_path'],
-                'root_cert_path' => PLUGINS_PATH.'/'.$payment_info['payment_config']['root_cert_path'],
+                'app_cert_path' => $payment_info['payment_config']['app_cert_path'],
+                'alipay_cert_path' => $payment_info['payment_config']['alipay_cert_path'],
+                'root_cert_path' => $payment_info['payment_config']['root_cert_path'],
             );
         }
 
