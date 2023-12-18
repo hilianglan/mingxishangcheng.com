@@ -40,10 +40,21 @@ class MemberAuth extends MobileMember
         }
         //得到alipay申请验证verify_id
         $result = $this->alipay_verify_id($member_array);
-        if(!$result['code']){
-            ds_json_encode(10001,'申请认证失败');
+        if (!$result['code']) {
+            ds_json_encode(10001, '申请认证失败');
         }
-        $verify_id=$result['data']['verify_id'];
+        $verify_id = $result['data']['verify_id'];
+        //通过百度身份识别接口认证图片基本信息和输入框是否一致
+        $idcard_info = get_hash_cache('idcard_info', $this->member_info['member_id']);
+        $idcard_info = json_decode($idcard_info, true);
+        if ($idcard_info) {
+            if ($idcard_info['real_name'] != $member_array['member_truename']) {
+                ds_json_encode(10001, lang('member_truename_error'));
+            }
+            if ($idcard_info['idcard'] != $member_array['member_idcard']) {
+                ds_json_encode(10001, lang('member_idcard_error'));
+            }
+        }
         //增加认证信息更新认证状态
         $member_array['verify_id'] = $verify_id;
         $member_model = model('member');
@@ -52,7 +63,7 @@ class MemberAuth extends MobileMember
             ['member_auth_state', 'in', [0, 2]]
         ];
         $member_model->editMember($condition, $member_array, $this->member_info['member_id']);
-        ds_json_encode(10000, '开始实名认证', ['verify_id' => $verify_id]);
+        ds_json_encode(10000, '开始实名校验', ['verify_id' => $verify_id]);
     }
 
     public function image_upload()
@@ -64,16 +75,28 @@ class MemberAuth extends MobileMember
             if (!$res['code']) {
                 ds_json_encode(10001, $res['msg']);
             }
-            if (!in_array(substr($file_name, 0, 20), array('member_idcard_image1', 'member_idcard_image2', 'member_idcard_image3'))) {
+            $file_key = substr($file_name, 0, 20);
+
+            if (!in_array($file_key, array('member_idcard_image1', 'member_idcard_image2', 'member_idcard_image3'))) {
                 ds_json_encode(10001, lang('param_error'));
             }
+            $file_path = get_member_idcard_image($res['data']['file_name']);
+            $idcard_side = '';
+            if ($file_key == 'member_idcard_image2') {
+                $idcard_side = config('idcard.idcard_side')[0];
+            } elseif ($file_key == 'member_idcard_image3') {
+                $idcard_side = config('idcard.idcard_side')[1];
+            }
+            $idcard_info = $this->check_image_idcard($file_path, $idcard_side);
             $member_array = array();
-            $member_array[substr($file_name, 0, 20)] = $res['data']['file_name'];
+            $member_array[$file_key] = $res['data']['file_name'];
             $member_model = model('member');
-            if (!$member_model->editMember(array(array('member_id', '=', $this->member_info['member_id']), array('member_auth_state', 'in', array(0, 2))), $member_array, $this->member_info['member_id'])) {
+            if (!$member_model->editMember(array(array('member_id', '=', $this->member_info['member_id']),
+                array('member_auth_state', 'in', array(0, 2))), $member_array, $this->member_info['member_id'])) {
                 ds_json_encode(10001, lang('ds_common_save_fail'));
             }
-            ds_json_encode(10000, '', array('file_name' => $res['data']['file_name'], 'file_path' => get_member_idcard_image($res['data']['file_name'])));
+            ds_json_encode(10000, '', array_merge(array('file_name' => $res['data']['file_name'], 'file_path' => $file_path),
+                $idcard_info));
         }
         ds_json_encode(10001, lang('param_error'));
     }
@@ -93,6 +116,50 @@ class MemberAuth extends MobileMember
             ds_json_encode(10001, lang('ds_common_save_fail'));
         }
         ds_json_encode(10000);
+    }
+
+    public function check_image_idcard($image_url, $idcard_side)
+    {
+        if (!$idcard_side) {
+            return [];
+        }
+        require_once(PLUGINS_PATH . '/user_auth/baidu_auth.php');
+        $baidu_auth = new \baidu_auth();
+        //正面照
+        $idcard_side = config('idcard.idcard_side')[0];
+        $result = $baidu_auth->check_idcard($idcard_side, $image_url);
+        if (!$result['code']) {
+            ds_json_encode(10001, '身份证照识别失败');
+        }
+        //开始解析结果
+        $words_result = $result['data']['words_result'];
+        $image_status = $result['data']['image_status'];
+        $risk_type = isset($result['data']['risk_type']) ? $result['data']['risk_type'] : '';
+        $idcard_number_type = $result['data']['idcard_number_type'];
+        $err_msg = '仅支持正常身份证认证';
+        if ($image_status != 'normal') {
+            if (isset(config('idcard.image_status')[$image_status])) {
+                $err_msg = config('idcard.image_status')[$image_status];
+            }
+            ds_json_encode(10001, 'image_status'.$err_msg);
+        }
+        if ($risk_type && $risk_type != 'normal') {
+            if (isset(config('idcard.risk_type')[$risk_type])) {
+                $err_msg = config('idcard.risk_type')[$risk_type];
+            }
+            ds_json_encode(10001, 'risk_type'.$err_msg);
+        }
+        if ($idcard_number_type != 1) {
+            if (isset(config('idcard.idcard_number_type')[$idcard_number_type])) {
+                $err_msg = config('idcard.idcard_number_type')[$idcard_number_type];
+            }
+            ds_json_encode(10001, 'idcard_number_type'.$err_msg);
+        }
+        if (isset($words_result['姓名']['words']) && isset($words_result['公民身份号码']['words'])) {
+            $data = ['real_name' => $words_result['姓名']['words'], 'idcard' => $words_result['公民身份号码']['words']];
+            set_hash_cache('idcard_info', $this->member_info['member_id'], json_encode($data));
+        }
+        return $data;
     }
 
     /**
@@ -137,10 +204,10 @@ class MemberAuth extends MobileMember
         }
         $auth = new \verify_auth($alipay_config);
         $result = $auth->get_auth_token($code);
-        if(!$result['code']){
-            ds_json_encode(10001,'token失效');
+        if (!$result['code']) {
+            ds_json_encode(10001, 'token失效');
         }
-        $token =$result['data']['access_token'];
+        $token = $result['data']['access_token'];
         $result = $auth->consult($verify_id, $token);
         if (!$result['code']) {
             ds_json_encode(10001, '认证失败');
@@ -157,11 +224,11 @@ class MemberAuth extends MobileMember
         $member_model = model('member');
         $condition = [
             ['member_id', '=', $this->member_info['member_id']],
-            ['member_auth_state', 'in', [0, 1,2]]
+            ['member_auth_state', 'in', [0, 1, 2]]
         ];
         $member_model->editMember($condition, $member_array, $this->member_info['member_id']);
 
-        ds_json_encode(10000,'',$result['data']);
+        ds_json_encode(10000, '', $result['data']);
     }
 
 }
